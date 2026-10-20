@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">TestWearApp</string>
+    <string name="hello">Hello, Wear OS!</string>
+    <string name="build_number">Build %1$d</string>
+</resources>
