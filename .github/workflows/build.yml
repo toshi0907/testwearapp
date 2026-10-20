@@ -1,0 +1,70 @@
+name: Build
+
+on:
+  # 作業ブランチはPR経由でビルドし、pushはmainのみに限定して二重ビルドを避ける
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  # main は Release 更新の途中でキャンセルされないよう順番に実行する
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug -PbuildNumber=${{ github.run_number }}
+
+      - name: Rename APK
+        run: mv app/build/outputs/apk/debug/app-debug.apk testwearapp-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: testwearapp-debug-${{ github.run_number }}
+          path: testwearapp-debug.apk
+
+  # 固定タグ latest のReleaseは main への push のときだけ更新する(書き込み権限はこのジョブのみ)
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: testwearapp-debug-${{ github.run_number }}
+
+      - name: Update latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          title="Latest build ${{ github.run_number }}"
+          notes="build: ${{ github.run_number }}"
+          if gh release view latest >/dev/null 2>&1; then
+            # 削除→再作成ではなく上書きで更新し、Releaseが消える瞬間を作らない
+            gh release upload latest testwearapp-debug.apk --clobber
+            gh release edit latest --title "$title" --notes "$notes"
+            git_ref_api="repos/${GH_REPO}/git/refs/tags/latest"
+            gh api -X PATCH "$git_ref_api" -f sha="${{ github.sha }}" -F force=true
+          else
+            gh release create latest testwearapp-debug.apk \
+              --target "${{ github.sha }}" --title "$title" --notes "$notes"
+          fi
