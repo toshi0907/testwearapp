@@ -18,6 +18,8 @@ Pixel Watch 2(Wear OS 4 / API 33〜)にインストール可能なスタンド�
 3. ウォッチとスマホを同じ Wi-Fi に接続し、ADB クライアント(PC の `adb`、またはスマホの ADB 対応アプリ)からペア設定して接続
 4. `adb install -r testwearapp-debug.apk`(署名鍵を固定しているため `-r` で上書き更新できる)
 
+※ ビルド番号(`versionCode`)は PR と main で共通の連番のため、PR のビルドを入れた後に番号の小さい main のビルドへ戻す場合は `adb install -r -d`(ダウングレード許可)を使う。
+
 ## Claude Code 用の設定
 
 myskills を submodule(`.myskills`)として取り込み、`.claude/skills/` にスキルごとの symlink を登録している。
